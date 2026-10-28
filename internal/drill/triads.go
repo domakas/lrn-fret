@@ -47,11 +47,12 @@ func (sp Spell) Make(card string, _ *rand.Rand) *Question {
 		want = append(want, n.String())
 	}
 	return &Question{
-		Card:    card,
-		Prompt:  fmt.Sprintf("Spell %s (%s triad): type 1 3 5, e.g. \"c e g\"", t.Name(), t.Quality.Name()),
-		Kind:    AnswerText,
-		NoBoard: true,
-		Words:   3,
+		Card:      card,
+		Prompt:    fmt.Sprintf("Spell %s (%s triad): type 1 3 5, e.g. \"c e g\"", t.Name(), t.Quality.Name()),
+		Kind:      AnswerText,
+		NoBoard:   true,
+		Words:     3,
+		NoteInput: true,
 		CheckText: func(in string) (bool, bool) {
 			fields := strings.FieldsFunc(in, func(r rune) bool { return r == ' ' || r == ',' })
 			if len(fields) != 3 {

@@ -13,6 +13,14 @@ import (
 )
 
 func (m Model) View() string {
+	if dbg != nil {
+		start := time.Now()
+		defer func() {
+			if took := time.Since(start); took >= slow {
+				debugf("render %s  [%v]  SLOW", screenNames[m.scr], took.Round(time.Microsecond))
+			}
+		}()
+	}
 	if m.blurred {
 		return m.viewBlurred()
 	}

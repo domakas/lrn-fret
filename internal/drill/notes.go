@@ -43,6 +43,7 @@ func (n Notes) Make(card string, _ *rand.Rand) *Question {
 		Marks:          map[Pos]Mark{p: {MarkTarget, "?"}},
 		FretMax:        12,
 		CheckText:      checkNote(pc),
+		NoteInput:      true,
 		Answer:         pc.Both(),
 		Expect:         pc.Sharp(),
 		Solution:       []Pos{p},

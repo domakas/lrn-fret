@@ -55,6 +55,9 @@ type Question struct {
 	// UI can ask again without counting a miss).
 	CheckText func(string) (ok, valid bool)
 	Words     int // AnswerText: words in the answer (0 = 1); space submits after the last one
+	// NoteInput: the answer is note names, so the UI shows typing as notes
+	// ("eb" → "Eb"). Not set for degrees like "b3".
+	NoteInput bool
 	CheckPos  func([]Pos) bool
 
 	Answer         string         // shown after answering, e.g. "A" or "Eb Gb Bb"

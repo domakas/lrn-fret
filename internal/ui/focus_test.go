@@ -128,3 +128,93 @@ func TestOctavesFindAll(t *testing.T) {
 		t.Fatal("a wrong pick should end the question as a miss")
 	}
 }
+
+func TestFormatNotes(t *testing.T) {
+	cases := map[string]string{
+		"c":        "C",
+		"eb gb bb": "Eb Gb Bb",
+		"EB GB BB": "Eb Gb Bb",
+		"bB c# F#": "Bb C# F#",
+		"am":       "Am",
+		"eb ":      "Eb ",
+		"x 3b":     "x 3b",
+		"f3":       "F#",
+		"c3 e3 g3": "C# E# G#",
+		"F33":      "F##",
+	}
+	for in, want := range cases {
+		if got := formatNotes(in); got != want {
+			t.Errorf("formatNotes(%q) = %q; want %q", in, got, want)
+		}
+	}
+}
+
+func TestSpellInputShownAsNotes(t *testing.T) {
+	m := newTestModel(t, "spell")
+	for _, k := range []tea.KeyMsg{
+		{Type: tea.KeyRunes, Runes: []rune("E")},
+		{Type: tea.KeyRunes, Runes: []rune("B")},
+		{Type: tea.KeySpace, Runes: []rune(" ")},
+		{Type: tea.KeyRunes, Runes: []rune("g")},
+		{Type: tea.KeyRunes, Runes: []rune("B")},
+	} {
+		m = send(m, k)
+	}
+	if m.quiz.input != "Eb Gb" {
+		t.Errorf("input = %q; want %q", m.quiz.input, "Eb Gb")
+	}
+}
+
+func TestDegreeInputNotFormatted(t *testing.T) {
+	m := newTestModel(t, "scales")
+	m = send(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("b")})
+	if m.quiz.input != "b" {
+		t.Errorf("degree input = %q; want %q (b3 must not become B3)", m.quiz.input, "b")
+	}
+}
+
+func TestThreeIsSharpInNoteAnswers(t *testing.T) {
+	m := newTestModel(t, "notes")
+	m = send(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("f")})
+	m = send(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("3")})
+	if m.quiz.input != "F#" {
+		t.Errorf("input = %q; want F#", m.quiz.input)
+	}
+	if ok, valid := m.quiz.q.CheckText(m.quiz.input); !valid {
+		t.Errorf("F# should parse (ok=%v)", ok)
+	}
+}
+
+func TestTypeAheadDuringPauseIsKept(t *testing.T) {
+	m := newTestModel(t, "spell") // first card is C major
+	typeStr := func(m Model, s string) Model {
+		for _, r := range s {
+			if r == ' ' {
+				m = send(m, tea.KeyMsg{Type: tea.KeySpace, Runes: []rune(" ")})
+			} else {
+				m = send(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+			}
+		}
+		return m
+	}
+	m = typeStr(m, "c e g ")
+	if !m.quiz.answered || !m.quiz.ok {
+		t.Fatal("C E G should be answered correctly")
+	}
+	seq := m.quiz.seq
+	m = typeStr(m, "c") // during the ✓ pause
+	if m.quiz.seq == seq {
+		t.Fatal("typing during the pause should move to the next question")
+	}
+	if m.quiz.input != "C" {
+		t.Errorf("first typed note was lost: input = %q; want %q", m.quiz.input, "C")
+	}
+
+	// control keys still only continue
+	m = newTestModel(t, "spell")
+	m = typeStr(m, "c e g ")
+	m = send(m, tea.KeyMsg{Type: tea.KeyEnter})
+	if m.quiz.answered || m.quiz.input != "" {
+		t.Errorf("enter should just continue: answered=%v input=%q", m.quiz.answered, m.quiz.input)
+	}
+}

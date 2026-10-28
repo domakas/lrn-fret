@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -177,9 +178,13 @@ func (m *Model) finish(ok bool, note string) tea.Cmd {
 	qz.ms = int(time.Since(qz.started).Milliseconds())
 	qz.answered, qz.ok = true, ok
 	m.store.Record(q.Card, ok, qz.ms, q.FastMs)
+	saveStart := time.Now()
 	if err := m.store.Save(); err != nil {
 		note = "could not save progress: " + err.Error()
+		debugf("save failed: %v", err)
 	}
+	debugf("answer card=%s ok=%v in %dms (input %q) · save took %v",
+		q.Card, ok, qz.ms, qz.input, time.Since(saveStart).Round(time.Microsecond))
 	if q.OnResult != nil {
 		q.OnResult(qz.sel, ok)
 	}
@@ -270,6 +275,16 @@ func (m *Model) openTheory(mod drill.Module) {
 // --- update ---
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if dbg == nil {
+		return m.update(msg)
+	}
+	start := time.Now()
+	nm, cmd := m.update(msg)
+	logUpdate(msg, nm.(Model), time.Since(start))
+	return nm, cmd
+}
+
+func (m Model) update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
@@ -431,7 +446,14 @@ func (m Model) updateQuiz(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if qz.answered {
-		return m, m.advance()
+		cmd := m.advance()
+		// Typing ahead: a note typed during the ✓ pause starts the next
+		// answer instead of being swallowed by the skip.
+		if typeAhead(k) && m.scr == scrQuiz && m.quiz.q.Kind == drill.AnswerText {
+			nm, cmd2 := m.updateQuiz(k)
+			return nm, tea.Batch(cmd, cmd2)
+		}
+		return m, cmd
 	}
 	if key == "/" {
 		return m, m.finish(false, "revealed")
@@ -457,6 +479,9 @@ func (m Model) updateQuiz(k tea.KeyMsg) (tea.Model, tea.Cmd) {
 		default:
 			if k.Type == tea.KeyRunes {
 				qz.input += string(k.Runes)
+				if q.NoteInput {
+					qz.input = formatNotes(qz.input)
+				}
 			}
 		}
 		return m, nil
@@ -509,6 +534,7 @@ func (m *Model) submitText() tea.Cmd {
 	ok, valid := qz.q.CheckText(qz.input)
 	if !valid {
 		qz.msg = fmt.Sprintf("didn't understand %q", strings.TrimSpace(qz.input))
+		debugf("input not understood for card=%s: %q", qz.q.Card, qz.input)
 		qz.input = ""
 		return nil
 	}
@@ -551,6 +577,16 @@ func (m *Model) pickPos() tea.Cmd {
 	return nil
 }
 
+// typeAhead reports whether a key is answer text (a letter, digit or #)
+// rather than a control key like enter, space or /.
+func typeAhead(k tea.KeyMsg) bool {
+	if k.Type != tea.KeyRunes || len(k.Runes) == 0 {
+		return false
+	}
+	r := k.Runes[0]
+	return unicode.IsLetter(r) || unicode.IsDigit(r) || r == '#'
+}
+
 func (qz *quiz) toggle(p Pos) {
 	if i := slices.Index(qz.sel, p); i >= 0 {
 		qz.sel = slices.Delete(qz.sel, i, i+1)
@@ -584,6 +620,21 @@ func parsePos(in string, q *drill.Question) (Pos, error) {
 		return Pos{}, fmt.Errorf("no such spot: string %d fret %d", p.S, p.F)
 	}
 	return p, nil
+}
+
+// formatNotes shows typed note names the standard way: the letter that starts
+// a word is uppercase, anything right after it lowercase, so "eb" and "EB"
+// both read "Eb" and "bb" reads "Bb". A 3 after the letter becomes # (no
+// shift needed: "f3" → "F#"). Words not starting with A–G are left alone.
+func formatNotes(s string) string {
+	words := strings.Split(s, " ")
+	for i, w := range words {
+		if w == "" || !strings.ContainsRune("abcdefgABCDEFG", rune(w[0])) {
+			continue
+		}
+		words[i] = strings.ToUpper(w[:1]) + strings.ReplaceAll(strings.ToLower(w[1:]), "3", "#")
+	}
+	return strings.Join(words, " ")
 }
 
 func dropLast(s string) string {

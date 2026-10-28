@@ -89,7 +89,7 @@ The clock stops while either is open.
 |-------|------|
 | Everywhere | `?` theory · `tab` circle of fifths · `esc` back · `ctrl+c` quit |
 | Menu | `w`/`s` or arrows to move, `enter` start, `1`–`8` jump to a drill, `m` quick mix, `c` circle, `p` stats |
-| Typed answers | `space` or `enter` submits. Multi-word answers (`eb gb bb`, `g c d`) submit on the space after the last word |
+| Typed answers | Note names are shown as notes as you type (`eb` → `Eb`); `3` after a letter is a sharp, so `f3` → `F#` with no shift. `space` or `enter` submits. Multi-word answers (`eb gb bb`, `g c d`) submit on the space after the last word |
 | Fretboard answers | `wasd` or arrows move, `space`/`enter` pick. For triads `space` marks a note, `enter` submits, `x` clears. Or type `string fret` (`4 7`; string 1 = high e), or just the fret when the string is given |
 | During a drill | `/` reveal the answer (counts as a miss) |
 
@@ -135,6 +135,10 @@ Then restart the terminal. Arrow keys never trigger it.
 go test ./...
 go run ./cmd/fret
 ```
+
+**Debug log:** `LRN_FRET_DEBUG=1 fret …` appends a timestamped log to `~/.lrn-fret/debug.log`. It records every
+key, answer, save time, auto-advance and focus change, plus any update or render slower than
+30 ms (marked `SLOW`). Off by default.
 
 | Package | What's in it |
 |---------|--------------|

@@ -92,5 +92,6 @@ func (c Circle) Make(card string, _ *rand.Rand) *Question {
 		q.Expect = q.Answer
 		q.Words = 3
 	}
+	q.NoteInput = kind != "sig"
 	return q
 }
